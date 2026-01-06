@@ -1,0 +1,5 @@
+Invoke-RestMethod -Uri "http://localhost:3000/auth/register" -Method POST -ContentType "application/json" -Body '{"email":"test@example.com","password":"password123"}'
+
+user                                                                                                              access_token
+----                                                                                                              ------------
+@{id=32efe6c8-4851-4978-82ba-2135f4ad8fbd; email=test@example.com; role=USER; createdAt=2025-12-30T08:20:08.298Z} eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
