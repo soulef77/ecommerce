@@ -44,11 +44,11 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "stripe": "^20.1.0"
-},
-"engines": {
-"node": ">=18.0.0",
-"npm": ">=9.0.0"
-},
+  },
+  "engines": {
+    "node": ">=20.19.6",
+    "npm": ">=10.3.0"
+  },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
