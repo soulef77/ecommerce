@@ -12,23 +12,17 @@ export class PaymentsService {
   private stripe: Stripe;
   private readonly logger = new Logger(PaymentsService.name);
 
-  // @ts-ignore
   constructor(private prisma: PrismaService) {
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
     if (!stripeSecretKey) {
-      this.logger.error(
-        'STRIPE_SECRET_KEY is not defined in environment variables',
-      );
+      this.logger.error('STRIPE_SECRET_KEY is not defined in environment variables');
       throw new Error('STRIPE_SECRET_KEY is not defined');
     }
 
-    this.stripe = new Stripe(stripeSecretKey, {
-      'apiVersion': '2025-12-15.clover',
+     this.stripe = new Stripe(stripeSecretKey, {
+      apiVersion: '2025-12-15.clover',
     });
   }
-
-
-
 
 async createPaymentIntent(orderId: string, userId: string) {
     this.logger.log(`Creating payment intent for order ${orderId}`);
