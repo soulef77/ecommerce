@@ -1,5 +1,5 @@
 import { config } from 'dotenv';
-config();
+config(); // Charge les variables d'environnement depuis le fichier .env
 
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
@@ -12,7 +12,7 @@ async function bootstrap() {
     rawBody: true, // Important pour les webhooks Stripe
   });
 
-  app.use(json({ limit: '50mb' })); // Augmente la limite de taille des requêtes JSON
+  app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
 
   app.useGlobalPipes(
@@ -30,6 +30,12 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
+  // Vérification des variables d'environnement critiques
+  if (!process.env.STRIPE_SECRET_KEY) {
+    console.error('STRIPE_SECRET_KEY is not defined in environment variables');
+    process.exit(1);
+  }
+
   // Swagger Configuration
   const swaggerConfig = new DocumentBuilder()
     .setTitle('BAZA E-Commerce API')
@@ -46,7 +52,7 @@ async function bootstrap() {
       },
       'JWT-auth',
     )
-    .addTag('Auth', 'Endpoints d\'authentification')
+    .addTag('Auth', "Endpoints d'authentification")
     .addTag('Products', 'Gestion des produits')
     .addTag('Categories', 'Gestion des catégories')
     .addTag('Cart', 'Gestion du panier')
