@@ -7,7 +7,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { Role } from '@prisma/client';  // ← Utilisez Prisma
+import { Role } from '@prisma/client'; // ← Utilisez Prisma
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -32,7 +32,7 @@ export class AuthService {
       data: {
         email: registerDto.email,
         password: hashedPassword,
-        role: registerDto.role || Role.USER,  // ← Prisma enum
+        role: registerDto.role || Role.USER, // ← Prisma enum
       },
       select: {
         id: true,
@@ -42,7 +42,7 @@ export class AuthService {
       },
     });
 
-    const token = await this.generateToken(user.id, user.email, user.role);
+    const token = this.generateToken(user.id, user.email, user.role);
 
     return {
       user,
@@ -68,7 +68,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const token = await this.generateToken(user.id, user.email, user.role);
+    const token = this.generateToken(user.id, user.email, user.role);
 
     return {
       user: {
@@ -97,7 +97,7 @@ export class AuthService {
     return user;
   }
 
-  private async generateToken(userId: string, email: string, role: Role) {
+  private generateToken(userId: string, email: string, role: Role) {
     const payload = { sub: userId, email, role };
     return this.jwtService.sign(payload);
   }
