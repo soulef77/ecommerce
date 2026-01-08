@@ -1,18 +1,31 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import Stripe from 'stripe';
 
 @Injectable()
 export class PaymentsService {
   private stripe: Stripe;
+  private readonly logger = new Logger(PaymentsService.name);
 
   constructor(private prisma: PrismaService) {
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+    if (!process.env.STRIPE_SECRET_KEY) {
+      this.logger.error('STRIPE_SECRET_KEY is not defined');
+      throw new Error('STRIPE_SECRET_KEY is not defined');
+    }
+
+    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2025-12-15.clover',
+    });
   }
 
-
   async createPaymentIntent(orderId: string, userId: string) {
-    // Récupérer la commande
+    this.logger.log(`Creating payment intent for order ${orderId}`);
+
     const order = await this.prisma.order.findFirst({
       where: {
         id: orderId,
@@ -32,8 +45,8 @@ export class PaymentsService {
       throw new BadRequestException('Order is not pending');
     }
 
-    // Si un paiement existe déjà, retourner le PaymentIntent existant
     if (order.payment) {
+      this.logger.log(`Payment already exists for order ${orderId}`);
       const paymentIntent = await this.stripe.paymentIntents.retrieve(
         order.payment.stripePaymentIntentId,
       );
@@ -44,7 +57,7 @@ export class PaymentsService {
       };
     }
 
-    // Créer un nouveau PaymentIntent
+    this.logger.log(`Creating new payment intent for order ${orderId}`);
     const paymentIntent = await this.stripe.paymentIntents.create({
       amount: order.totalAmount,
       currency: 'eur',
@@ -57,7 +70,6 @@ export class PaymentsService {
       },
     });
 
-    // Enregistrer le paiement en base
     await this.prisma.payment.create({
       data: {
         orderId: order.id,
@@ -73,14 +85,15 @@ export class PaymentsService {
     };
   }
 
-  async handleWebhook(signature: string, rawBody: Buffer | undefined) {
+  async handleWebhook(signature: string, rawBody: Buffer) {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
-      throw new Error('Webhook secret not configured');
+      this.logger.error('STRIPE_WEBHOOK_SECRET is not defined');
+      throw new Error('STRIPE_WEBHOOK_SECRET is not defined');
     }
 
-    if (!rawBody) {  // ← Vérification ajoutée
+    if (!rawBody) {
       throw new BadRequestException('Request body is required');
     }
 
@@ -93,50 +106,54 @@ export class PaymentsService {
         webhookSecret,
       );
     } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      this.logger.error(`Webhook Error: ${err.message}`);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       throw new BadRequestException(`Webhook Error: ${err.message}`);
     }
 
-    // Gérer les différents événements
     switch (event.type) {
       case 'payment_intent.succeeded':
-        await this.handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);
+        await this.handlePaymentIntentSucceeded(event.data.object);
         break;
 
       case 'payment_intent.payment_failed':
-        await this.handlePaymentIntentFailed(event.data.object as Stripe.PaymentIntent);
+        await this.handlePaymentIntentFailed(event.data.object);
         break;
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        this.logger.log(`Unhandled event type: ${event.type}`);
     }
 
     return { received: true };
   }
 
-  private async handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+  private async handlePaymentIntentSucceeded(
+    paymentIntent: Stripe.PaymentIntent,
+  ) {
     const payment = await this.prisma.payment.findUnique({
       where: { stripePaymentIntentId: paymentIntent.id },
       include: { order: true },
     });
 
     if (!payment) {
-      console.error(`Payment not found for PaymentIntent: ${paymentIntent.id}`);
+      this.logger.error(
+        `Payment not found for PaymentIntent: ${paymentIntent.id}`,
+      );
       return;
     }
 
-    // Mettre à jour le paiement
     await this.prisma.payment.update({
       where: { id: payment.id },
       data: { status: 'SUCCEEDED' },
     });
 
-    // Mettre à jour la commande
     await this.prisma.order.update({
       where: { id: payment.orderId },
       data: { status: 'PAID' },
     });
 
-    console.log(`✅ Payment succeeded for order: ${payment.orderId}`);
+    this.logger.log(`Payment succeeded for order: ${payment.orderId}`);
   }
 
   private async handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
@@ -146,17 +163,18 @@ export class PaymentsService {
     });
 
     if (!payment) {
-      console.error(`Payment not found for PaymentIntent: ${paymentIntent.id}`);
+      this.logger.error(
+        `Payment not found for PaymentIntent: ${paymentIntent.id}`,
+      );
       return;
     }
 
-    // Mettre à jour le paiement
     await this.prisma.payment.update({
       where: { id: payment.id },
       data: { status: 'FAILED' },
     });
 
-    console.log(`❌ Payment failed for order: ${payment.orderId}`);
+    this.logger.log(`Payment failed for order: ${payment.orderId}`);
   }
 
   async getPaymentStatus(orderId: string, userId: string) {
