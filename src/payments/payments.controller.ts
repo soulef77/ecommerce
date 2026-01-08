@@ -1,19 +1,29 @@
-import * as common from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Headers,
+  Req,
+  UseGuards,
+  Get,
+  Param,
+} from '@nestjs/common';
+import express from 'express';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import * as userInterface from '../auth/interfaces/user.interface';
 
-@common.Controller('payments')
+@Controller('payments')
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
-  @common.UseGuards(JwtAuthGuard)
-  @common.Post('create-payment-intent')
+  @UseGuards(JwtAuthGuard)
+  @Post('create-payment-intent')
   createPaymentIntent(
     @CurrentUser() user: userInterface.UserPayload,
-    @common.Body() createPaymentIntentDto: CreatePaymentIntentDto,
+    @Body() createPaymentIntentDto: CreatePaymentIntentDto,
   ) {
     return this.paymentsService.createPaymentIntent(
       createPaymentIntentDto.orderId,
@@ -21,19 +31,24 @@ export class PaymentsController {
     );
   }
 
-  @common.Post('webhook')
+  @Post('webhook')
   async handleWebhook(
-    @common.Headers('stripe-signature') signature: string,
-    @common.Req() request: common.RawBodyRequest<Request>,
+    @Headers('stripe-signature') signature: string,
+    @Req() request: express.Request,
   ) {
-    return this.paymentsService.handleWebhook(signature, request.rawBody);
+    // Vérifiez que rawBody est disponible et est un Buffer
+    if (!request['rawBody'] || !(request['rawBody'] instanceof Buffer)) {
+      throw new Error('Raw body is required and must be a Buffer');
+    }
+
+    return this.paymentsService.handleWebhook(signature, request['rawBody']);
   }
 
-  @common.UseGuards(JwtAuthGuard)
-  @common.Get('status/:orderId')
+  @UseGuards(JwtAuthGuard)
+  @Get('status/:orderId')
   getPaymentStatus(
     @CurrentUser() user: userInterface.UserPayload,
-    @common.Param('orderId') orderId: string,
+    @Param('orderId') orderId: string,
   ) {
     return this.paymentsService.getPaymentStatus(orderId, user.id);
   }

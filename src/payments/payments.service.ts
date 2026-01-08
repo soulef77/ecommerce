@@ -19,7 +19,7 @@ export class PaymentsService {
     }
 
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: '2025-12-15.clover',
+      apiVersion: '2023-10-16', // Version standard de l'API Stripe
     });
   }
 
@@ -94,6 +94,7 @@ export class PaymentsService {
     }
 
     if (!rawBody) {
+      this.logger.error('Request body is required');
       throw new BadRequestException('Request body is required');
     }
 
@@ -106,19 +107,17 @@ export class PaymentsService {
         webhookSecret,
       );
     } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       this.logger.error(`Webhook Error: ${err.message}`);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       throw new BadRequestException(`Webhook Error: ${err.message}`);
     }
 
     switch (event.type) {
       case 'payment_intent.succeeded':
-        await this.handlePaymentIntentSucceeded(event.data.object);
+        await this.handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);
         break;
 
       case 'payment_intent.payment_failed':
-        await this.handlePaymentIntentFailed(event.data.object);
+        await this.handlePaymentIntentFailed(event.data.object as Stripe.PaymentIntent);
         break;
 
       default:

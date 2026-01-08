@@ -5,11 +5,15 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { json, urlencoded } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
-    rawBody: true,
+    rawBody: true, // Important pour les webhooks Stripe
   });
+
+  app.use(json({ limit: '50mb' })); // Augmente la limite de taille des requêtes JSON
+  app.use(urlencoded({ extended: true, limit: '50mb' }));
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -27,7 +31,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   // Swagger Configuration
-  const config = new DocumentBuilder()
+  const swaggerConfig = new DocumentBuilder()
     .setTitle('BAZA E-Commerce API')
     .setDescription('API documentation pour la boutique BAZA')
     .setVersion('1.0')
@@ -50,7 +54,7 @@ async function bootstrap() {
     .addTag('Payments', 'Gestion des paiements')
     .build();
 
-  const document = SwaggerModule.createDocument(app, config);
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document, {
     customSiteTitle: 'BAZA API Docs',
     customfavIcon: 'https://nestjs.com/img/logo_text.svg',
@@ -67,4 +71,7 @@ async function bootstrap() {
   console.log(`📚 Swagger docs available at http://localhost:${port}/api/docs`);
 }
 
-bootstrap();
+bootstrap().catch((err) => {
+  console.error('Failed to start the server:', err);
+  process.exit(1);
+});
